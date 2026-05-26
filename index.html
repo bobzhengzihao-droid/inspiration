@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>灵感气泡 · 暖光</title>
+
+<style>
+/* =========================
+   Warm Panel · 暖光气泡
+========================= */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; width: 100%; height: 100%; overflow: hidden;
+  background: #f5ebe0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #5c3d2e;
+}
+
+body::before {
+  content: ""; position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 30% 25%, rgba(255,220,160,0.45) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 70% 30%, rgba(255,200,130,0.25) 0%, transparent 55%),
+    linear-gradient(175deg, #f8efe4 0%, #f0e0cc 25%, #e8d5b8 60%, #dfc8a5 100%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: ""; position: fixed; inset: -20%; width: 140%; height: 140%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 200px 200px; pointer-events: none; z-index: 0; opacity: 0.6;
+}
+
+#app { position: relative; width: 100%; height: 100%; overflow: hidden; z-index: 1; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+#bubbleLayer { position: absolute; inset: 0; z-index: 3; }
+
+/* Bubble */
+.bubble {
+  position: absolute; border-radius: 50%;
+  user-select: none; touch-action: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 500; overflow: hidden;
+  transition: opacity 0.45s ease, filter 0.4s ease, box-shadow 0.5s ease;
+  background:
+    radial-gradient(ellipse 38% 30% at 30% 28%, rgba(255,250,240,0.55) 0%, rgba(255,230,190,0.15) 15%, transparent 38%),
+    radial-gradient(ellipse 30% 22% at 65% 68%, rgba(255,210,150,0.1) 0%, transparent 45%),
+    radial-gradient(circle at 50% 55%, rgba(255,190,120,0.12) 0%, rgba(200,130,60,0.04) 55%, transparent 72%),
+    linear-gradient(160deg, var(--bubble-color, #e8a840), color-mix(in srgb, var(--bubble-color, #e8a840) 38%, #5a2810) 72%, rgba(255,200,130,0.06));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,220,170,0.2), inset 0 0 30px rgba(255,200,140,0.06),
+    0 6px 28px rgba(80,40,20,0.2), 0 2px 8px rgba(80,40,20,0.12),
+    0 0 45px color-mix(in srgb, var(--bubble-color, #e8a840) 15%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bubble .speck {
+  position: absolute; pointer-events: none; z-index: 4;
+  border-radius: 50%; background: rgba(255,250,240,0.85);
+  box-shadow: 0 0 2px rgba(255,245,230,0.6);
+}
+.bubble-title {
+  position: relative; z-index: 3;
+  font-family: "Noto Serif SC", "Songti SC", "STSong", "KaiTi", serif;
+  font-size: 14px; letter-spacing: 0.08em;
+  text-align: center; padding: 0 12px; opacity: 0.88;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;
+}
+.bubble.collide { filter: brightness(1.2) saturate(1.1); }
+.bubble.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,220,170,0.3), inset 0 0 30px rgba(255,200,140,0.08),
+    0 0 80px color-mix(in srgb, var(--bubble-color, #e8a840) 30%, transparent),
+    0 0 160px color-mix(in srgb, var(--bubble-color, #e8a840) 15%, transparent),
+    0 8px 35px rgba(80,40,20,0.28);
+  z-index: 50 !important;
+}
+.fade-out {
+  opacity: 0 !important; pointer-events: none !important;
+  filter: blur(2px) brightness(0.7);
+  transition: opacity 0.5s ease, filter 0.5s ease;
+}
+
+/* Expanded — large circle */
+.bubble.expanded {
+  border-radius: 50%; cursor: default;
+  display: flex; flex-direction: column; align-items: center;
+  overflow: hidden; z-index: 50 !important;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,250,240,0.55) 0%, rgba(255,240,220,0.3) 40%, rgba(240,220,195,0.5) 80%, rgba(220,195,165,0.6) 100%) !important;
+  box-shadow: 0 20px 60px rgba(80,40,20,0.2), 0 0 0 1px rgba(200,150,100,0.15) inset !important;
+  transition: width 0.45s cubic-bezier(.2,.8,.2,1), height 0.45s cubic-bezier(.2,.8,.2,1), left 0.45s cubic-bezier(.2,.8,.2,1), top 0.45s cubic-bezier(.2,.8,.2,1);
+}
+.bubble.expanded .speck, .bubble.expanded .bubble-title { display: none; }
+
+.expanded-header { flex-shrink: 0; padding: 10% 12% 2% 12%; text-align: center; }
+.expanded-title {
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  font-size: 16px; letter-spacing: 0.06em; color: #5a3820; margin: 0;
+}
+
+/* Mini-bubble grid */
+.idea-bubbles {
+  flex: 1; overflow-y: auto;
+  padding: 2% 14% 0 14%; width: 100%;
+  display: flex; flex-wrap: wrap;
+  justify-content: center; align-content: flex-start;
+  gap: 10px;
+}
+.idea-bubbles::-webkit-scrollbar { width: 3px; }
+.idea-bubbles::-webkit-scrollbar-thumb { background: rgba(180,120,60,0.18); border-radius: 3px; }
+
+.mini-bubble {
+  width: 50px; height: 50px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.15) inset;
+  transition: transform 0.2s ease; flex-shrink: 0;
+  animation: pop-in 0.35s cubic-bezier(.2,.8,.2,1);
+}
+.mini-bubble:active { transform: scale(1.15); }
+@keyframes pop-in { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Detail overlay */
+.idea-overlay {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(255,245,235,0.95);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 18% 16%; z-index: 10; text-align: center;
+  animation: fade-in 0.25s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.idea-overlay .full-text {
+  font-size: 14px; line-height: 1.8; color: #5a3820;
+  white-space: pre-wrap; font-family: "Noto Serif SC", "Songti SC", serif;
+  margin-bottom: 14px; max-height: 55%; overflow-y: auto;
+}
+.idea-overlay .overlay-actions { display: flex; gap: 8px; }
+.idea-overlay .overlay-actions button {
+  border: 1px solid rgba(180,120,60,0.25); background: rgba(180,120,60,0.08);
+  color: #6b4830; padding: 6px 14px; border-radius: 999px;
+  cursor: pointer; font-size: 12px; transition: all 0.2s ease;
+}
+.idea-overlay .overlay-actions button:hover { background: rgba(180,120,60,0.2); }
+.idea-overlay .overlay-actions button.danger {
+  background: rgba(220,80,50,0.08); border-color: rgba(220,100,70,0.15);
+  color: rgba(180,60,30,0.85);
+}
+.idea-overlay .close-overlay {
+  position: absolute; top: 14%; right: 20%;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid rgba(180,120,60,0.2);
+  background: rgba(255,245,235,0.8); color: #8b6240;
+  font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Color picker */
+.color-picker { display: flex; gap: 5px; margin-bottom: 5px; justify-content: center; }
+.color-dot {
+  width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; flex-shrink: 0;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.color-dot:hover { transform: scale(1.2); }
+.color-dot.selected { border-color: rgba(100,50,20,0.5); transform: scale(1.2); }
+
+/* Input */
+.expanded-input-wrap {
+  flex-shrink: 0; padding: 0 18% 8% 18%; width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.expanded-input-row { display: flex; gap: 5px; align-items: flex-end; width: 100%; }
+.expanded-input {
+  flex: 1; border: none; outline: none;
+  background: rgba(180,120,60,0.08); color: #5a3820;
+  padding: 6px 10px; border-radius: 10px;
+  font-size: 12px; line-height: 1.5; resize: none;
+  overflow-y: auto; max-height: 64px; min-width: 0;
+  font-family: "Noto Serif SC", "Songti SC", serif; transition: background 0.2s;
+}
+.expanded-input:focus { background: rgba(180,120,60,0.14); }
+.expanded-input::placeholder { color: rgba(160,100,50,0.25); }
+
+.expanded-submit {
+  width: 28px; height: 28px; min-width: 28px; border-radius: 50%;
+  border: none; background: rgba(180,120,60,0.15);
+  color: rgba(120,70,30,0.6); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s ease; flex-shrink: 0;
+}
+.expanded-submit:hover, .expanded-submit:active {
+  background: rgba(180,120,60,0.3); color: rgba(100,50,20,0.8);
+}
+
+/* Name dialog */
+.name-dialog-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(40,20,10,0.4);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fade-in 0.2s ease;
+}
+.name-dialog {
+  background: rgba(255,245,235,0.95);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px; padding: 22px 20px 18px;
+  width: min(300px, 82vw); text-align: center;
+  box-shadow: 0 16px 40px rgba(60,30,10,0.25);
+}
+.name-dialog h3 {
+  margin: 0 0 14px; font-family: "Noto Serif SC","Songti SC",serif;
+  font-size: 16px; color: #5a3820; letter-spacing: 0.06em;
+}
+.name-dialog input {
+  width: 100%; border: 1px solid rgba(180,120,60,0.2); outline: none;
+  background: rgba(180,120,60,0.06); color: #5a3820;
+  padding: 9px 12px; border-radius: 12px; font-size: 14px;
+  font-family: "Noto Serif SC","Songti SC",serif; text-align: center;
+  transition: border-color 0.2s;
+}
+.name-dialog input:focus { border-color: rgba(180,120,60,0.5); }
+.name-dialog-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: center; }
+.name-dialog-actions button {
+  border: 1px solid rgba(180,120,60,0.2); background: rgba(180,120,60,0.08);
+  color: #6b4830; padding: 7px 20px; border-radius: 999px;
+  cursor: pointer; font-size: 13px; transition: all 0.2s ease;
+}
+.name-dialog-actions button:hover { background: rgba(180,120,60,0.2); }
+.name-dialog-actions button.primary { background: rgba(200,140,60,0.25); border-color: rgba(200,140,60,0.35); }
+
+/* Done orbs */
+.done-orb {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  opacity: 0.3; filter: grayscale(0.3) blur(0.4px);
+  background: var(--bubble-color, #e8a840);
+  box-shadow: 0 0 6px var(--bubble-color, #e8a840);
+  transition: opacity 0.4s ease;
+}
+
+#deleteMainBtn {
+  position: absolute; z-index: 55;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(200,60,30,0.1); border: 1px solid rgba(200,80,40,0.18);
+  color: rgba(180,60,20,0.8); font-size: 15px; font-weight: 300;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s ease;
+}
+#deleteMainBtn:hover { background: rgba(200,40,20,0.25); transform: scale(1.1); }
+
+/* Controls */
+#controls { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 9px; z-index: 100; }
+.ctrl-btn {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid rgba(180,120,60,0.15);
+  background: rgba(255,245,235,0.55); color: rgba(140,90,50,0.65);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 3px 14px rgba(80,40,20,0.1);
+  transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+.ctrl-btn:hover { transform: scale(1.06); background: rgba(255,245,235,0.75); box-shadow: 0 5px 20px rgba(80,40,20,0.15); }
+.ctrl-btn:active { transform: scale(0.94); }
+
+#empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+  color: rgba(160,100,50,0.28); gap: 16px; text-align: center; z-index: 1;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 14px; letter-spacing: 0.08em; line-height: 1.8;
+}
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: rgba(200,140,80,0.5); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse {
+  0% { transform: scale(0.5); opacity: 0.12; }
+  50% { transform: scale(1.6); opacity: 0.55; }
+  100% { transform: scale(0.5); opacity: 0.12; }
+}
+#counter { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); font-size: 10px; letter-spacing: 0.2em; opacity: 0.15; z-index: 90; color: #8b6240; }
+#reviewBubble {
+  position: absolute; left: 50%; top: 14%; transform: translateX(-50%);
+  min-width: 180px; max-width: 80vw;
+  background: rgba(255,245,235,0.75); border: 1px solid rgba(200,150,100,0.15);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-radius: 999px; padding: 10px 20px; z-index: 160; text-align: center;
+  font-family: "Noto Serif SC", "Songti SC", serif; font-size: 13px;
+  letter-spacing: 0.04em; color: #6b4830; opacity: 0; pointer-events: none;
+  animation: review-glow 2s ease-in-out infinite alternate;
+}
+@keyframes review-glow {
+  from { box-shadow: 0 0 14px rgba(200,150,100,0.1); }
+  to { box-shadow: 0 0 32px rgba(200,150,100,0.25); }
+}
+.particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; pointer-events: none; }
+
+@media (max-width: 768px) {
+  .ctrl-btn { width: 42px; height: 42px; font-size: 18px; }
+  .bubble-title { font-size: 12px; }
+  .expanded-title { font-size: 15px; }
+}
+</style>
+</head>
+
+<body>
+
+<div id="app">
+    <canvas id="bg"></canvas>
+    <div id="bubbleLayer"></div>
+    <div id="empty"><div class="pulse"></div><div>你的世界还没有气泡<br/>点击右下角 + 创建第一个灵感</div></div>
+    <div id="reviewBubble"></div>
+    <div id="counter">0 IDEAS</div>
+    <div id="controls">
+        <button class="ctrl-btn" id="addBtn">+</button>
+        <button class="ctrl-btn" id="exportBtn">&#x21E9;</button>
+    </div>
+</div>
+
+<script>
+const STORAGE_KEY = "bubble_ideas_v6";
+const BUBBLE_COLORS = ["#e8a840","#e8b850","#e89840","#f0b860","#e09038"];
+const PICKER_COLORS = ["#e8a840","#e89858","#e87050","#d0a060","#c88080","#80b890","#6898c8","#a080c8"];
+
+let state = { mode:"float", focused:null, reviewToday:{}, bubbles:[] };
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function save(){
+    const clean = b => ({ id:b.id, name:b.name, color:b.color, x:b.x, y:b.y, vx:b.vx, vy:b.vy, r:b.r, ideas:b.ideas });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ bubbles: state.bubbles.map(clean), reviewToday: state.reviewToday }));
+}
+
+function sanitizeBubble(b, i) {
+    if (!b.name || typeof b.name !== "string") b.name = "灵感气泡 " + (i + 1);
+    if (!b.color || typeof b.color !== "string" || !b.color.startsWith("#")) b.color = BUBBLE_COLORS[i % BUBBLE_COLORS.length];
+    if (typeof b.r !== "number" || isNaN(b.r) || b.r < 20 || b.r > 300) b.r = Math.min(110, Math.max(70, innerWidth * 0.08 + 30));
+    if (typeof b.x !== "number" || isNaN(b.x)) b.x = Math.random() * (innerWidth - b.r * 2) + b.r;
+    if (typeof b.y !== "number" || isNaN(b.y)) b.y = Math.random() * (innerHeight - b.r * 2) + b.r;
+    if (typeof b.vx !== "number" || isNaN(b.vx)) b.vx = (Math.random() - 0.5) * 0.7;
+    if (typeof b.vy !== "number" || isNaN(b.vy)) b.vy = (Math.random() - 0.5) * 0.7;
+    b.x = Math.min(innerWidth - b.r, Math.max(b.r, b.x)); b.y = Math.min(innerHeight - b.r, Math.max(b.r, b.y));
+    if (!Array.isArray(b.ideas)) b.ideas = [];
+    // Ensure ideas have color & summary
+    b.ideas.forEach(idea => { if (!idea.color) idea.color = b.color; if (!idea.summary) idea.summary = summarizeText(idea.content); });
+    return b;
+}
+
+function load(){
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ try{
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.bubbles)) state.bubbles = parsed.bubbles.filter(b => b && typeof b === "object").map((b, i) => sanitizeBubble(b, i));
+        if (parsed.reviewToday && typeof parsed.reviewToday === "object") state.reviewToday = parsed.reviewToday;
+    }catch(e){} }
+}
+load(); state.mode = "float"; state.focused = null;
+
+const app = document.getElementById("app"), layer = document.getElementById("bubbleLayer");
+const counter = document.getElementById("counter"), empty = document.getElementById("empty");
+const canvas = document.getElementById("bg"), ctx = canvas.getContext("2d");
+let _prevW = innerWidth, _prevH = innerHeight;
+
+function resize(){
+    canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
+    canvas.style.width = innerWidth + "px"; canvas.style.height = innerHeight + "px";
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    const sx = _prevW>0?innerWidth/_prevW:1, sy = _prevH>0?innerHeight/_prevH:1;
+    state.bubbles.forEach(b => {
+        if (state.mode==="expanded" && state.focused===b.id) return;
+        const newR = Math.min(110, Math.max(70, innerWidth*0.08 + (b.r - Math.min(110, Math.max(70, _prevW*0.08)))));
+        b.r = newR; b.x = Math.min(innerWidth-b.r, Math.max(b.r, b.x*sx)); b.y = Math.min(innerHeight-b.r, Math.max(b.r, b.y*sy));
+        if (b.el && b.el.style) { b.el.style.width = (b.r*2)+"px"; b.el.style.height = (b.r*2)+"px"; }
+    });
+    _prevW = innerWidth; _prevH = innerHeight;
+}
+resize(); addEventListener("resize",resize);
+
+if(state.bubbles.length===0){
+    ["温暖灵感","深夜思绪","未来计划"].forEach((n,i)=>{ createBubble(n, BUBBLE_COLORS[i%5]); });
+} else {
+    state.bubbles.forEach(b => {
+        if (!b.el || !b.el.style) renderBubble(b);
+        if (Math.abs(b.vx)<0.08) b.vx = (Math.random()-.5)*1.0;
+        if (Math.abs(b.vy)<0.08) b.vy = (Math.random()-.5)*1.0;
+    });
+}
+
+function createBubble(name, color){
+    const r = Math.min(110, Math.max(70, innerWidth*0.08+Math.random()*30));
+    const bubble = { id:uid(), name, color, x:Math.random()*(innerWidth-r*2)+r, y:Math.random()*(innerHeight-r*2)+r, vx:(Math.random()-.5)*0.7, vy:(Math.random()-.5)*0.7, r, ideas:[], el:null, drag:false, original:null };
+    state.bubbles.push(bubble); renderBubble(bubble); save();
+}
+
+function renderBubble(b){
+    const safeColor = (typeof b.color==="string"&&b.color.startsWith("#"))?b.color:"#e8a840";
+    const safeR = (typeof b.r==="number"&&!isNaN(b.r)&&b.r>0)?b.r:80;
+    const el = document.createElement("div"); el.className = "bubble";
+    el.style.setProperty("--bubble-color", safeColor);
+    el.style.width = safeR*2+"px"; el.style.height = safeR*2+"px";
+    el.style.left = (b.x-safeR)+"px"; el.style.top = (b.y-safeR)+"px";
+    for (let i=0;i<3;i++) {
+        const sp = document.createElement("div"); sp.className = "speck";
+        sp.style.width = (2+i*1.2)+"px"; sp.style.height = (2+i*1.2)+"px"; el.appendChild(sp);
+    }
+    const title = document.createElement("div"); title.className = "bubble-title"; title.textContent = b.name; el.appendChild(title);
+    layer.appendChild(el); b.el = el;
+    let startX,startY,moved=false,lastX,lastY,lastTime;
+    const down = e=>{ startX=getX(e);startY=getY(e);lastX=startX;lastY=startY;lastTime=performance.now();moved=false;b.drag=true; };
+    const move = e=>{ if(!b.drag||state.mode!=="float")return; const x=getX(e),y=getY(e); if(Math.hypot(x-startX,y-startY)>5)moved=true; b.x+=x-lastX;b.y+=y-lastY; const now=performance.now(),dt=now-lastTime||16; b.vx=(x-lastX)/dt*10;b.vy=(y-lastY)/dt*10; lastX=x;lastY=y;lastTime=now; };
+    const up = ()=>{ if(!b.drag)return;b.drag=false; if(!moved)handleClick(b); };
+    el.addEventListener("pointerdown",down); window.addEventListener("pointermove",move); window.addEventListener("pointerup",up);
+}
+function getX(e){ return e.touches?e.touches[0].clientX:e.clientX; }
+function getY(e){ return e.touches?e.touches[0].clientY:e.clientY; }
+
+function handleClick(b){ if(state.mode==="float")expandBubble(b); }
+
+function expandBubble(b){
+    state.mode="expanded"; state.focused=b.id;
+    b._origR=b.r; b._origX=b.x; b._origY=b.y;
+    state.bubbles.forEach(o=>{ if(o.id!==b.id&&o.el&&o.el.style)o.el.classList.add("fade-out"); });
+    const el=b.el; if(!el||!el.style)return;
+    const tSize=Math.min(400,innerWidth*0.82,innerHeight*0.7);
+    let tx=b.x-tSize/2,ty=b.y-tSize/2,pad=16;
+    tx=Math.min(innerWidth-tSize-pad,Math.max(pad,tx)); ty=Math.min(innerHeight-tSize-pad,Math.max(pad,ty));
+    b._expandTX=tx;b._expandTY=ty;b._expandW=tSize;b._expandH=tSize;
+    b._pickColor=b.color; b._pinchScale=1;
+
+    el.style.transition="width 0.45s cubic-bezier(.2,.8,.2,1),height 0.45s cubic-bezier(.2,.8,.2,1),left 0.45s cubic-bezier(.2,.8,.2,1),top 0.45s cubic-bezier(.2,.8,.2,1)";
+    el.style.width=tSize+"px";el.style.height=tSize+"px";el.style.left=tx+"px";el.style.top=ty+"px";
+    el.classList.add("expanded");
+
+    setTimeout(()=>{
+        el.innerHTML=`<div class="expanded-header"><h2 class="expanded-title">${b.name}</h2></div><div class="idea-bubbles" id="ideaBubbles-${b.id}"></div><div class="expanded-input-wrap"><div class="color-picker" id="colorPicker-${b.id}"></div><div class="expanded-input-row"><textarea class="expanded-input" id="expandedInput-${b.id}" placeholder="记录灵感…" rows="1"></textarea><button class="expanded-submit" id="expandedSubmit-${b.id}">&#x2191;</button></div></div>`;
+        const pickerEl=document.getElementById("colorPicker-"+b.id);
+        PICKER_COLORS.forEach(c=>{ const dot=document.createElement("div");dot.className="color-dot"+(c===b._pickColor?" selected":"");dot.style.background=c;dot.onclick=e=>{e.stopPropagation();b._pickColor=c;pickerEl.querySelectorAll(".color-dot").forEach(d=>d.classList.remove("selected"));dot.classList.add("selected");};pickerEl.appendChild(dot); });
+        renderIdeaBubbles(b);
+        const input=document.getElementById("expandedInput-"+b.id),submitBtn=document.getElementById("expandedSubmit-"+b.id);
+        const doAdd=()=>{ if(input.value.trim())addIdeaFromInput(b,input); };
+        if(input){ input.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();doAdd();} }); input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,64)+"px";}); setTimeout(()=>input.focus(),300);
+            // Mobile keyboard avoidance
+            const isMobile='ontouchstart' in window||navigator.maxTouchPoints>0;
+            if(isMobile){
+                const shiftUp=()=>{ el.style.top=Math.max(8,b._expandTY-120)+"px"; };
+                const shiftDown=()=>{ el.style.top=b._expandTY+"px"; el.style.transition="width 0.45s cubic-bezier(.2,.8,.2,1),height 0.45s cubic-bezier(.2,.8,.2,1),left 0.45s cubic-bezier(.2,.8,.2,1),top 0.35s ease"; };
+                input.addEventListener("focus",shiftUp);
+                input.addEventListener("blur",()=>{setTimeout(shiftDown,200);});
+            }
+        }
+        if(submitBtn)submitBtn.addEventListener("click",doAdd);
+        // Pinch zoom
+        let iDist=0,iScale=1;
+        el.addEventListener("touchstart",e=>{ if(e.touches.length===2){e.preventDefault();iDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);iScale=b._pinchScale;} },{passive:false});
+        el.addEventListener("touchmove",e=>{ if(e.touches.length===2){e.preventDefault();const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);b._pinchScale=Math.min(2,Math.max(0.7,iScale*d/iDist));el.style.transform=`scale(${b._pinchScale})`;} },{passive:false});
+        el.addEventListener("touchend",e=>{ if(e.touches.length<2&&b._pinchScale!==1){clearTimeout(b._pinchTimer);b._pinchTimer=setTimeout(()=>{b._pinchScale=1;el.style.transition="transform 0.3s ease";el.style.transform="scale(1)";setTimeout(()=>{el.style.transition="";},300);},1500);} });
+    },480);
+
+    const delBtn=document.createElement("div");delBtn.id="deleteMainBtn";delBtn.textContent="×";delBtn.onclick=e=>{e.stopPropagation();deleteBubble(b);};layer.appendChild(delBtn);
+    renderDoneOrbs(b); maybeReview(b);
+}
+
+function collapseBubble(){
+    const b=state.bubbles.find(x=>x.id===state.focused); if(!b){state.mode="float";state.focused=null;return;}
+    const delBtn=document.getElementById("deleteMainBtn");if(delBtn)delBtn.remove();
+    document.querySelectorAll(".done-orb").forEach(o=>o.remove());
+    const el=b.el;if(!el||!el.style)return;
+    el.classList.remove("expanded");
+    el.style.transition="width 0.4s cubic-bezier(.2,.8,.2,1),height 0.4s cubic-bezier(.2,.8,.2,1),left 0.4s cubic-bezier(.2,.8,.2,1),top 0.4s cubic-bezier(.2,.8,.2,1)";
+    el.style.width=(b._origR*2)+"px";el.style.height=(b._origR*2)+"px";
+    el.style.left=(b._origX-b._origR)+"px";el.style.top=(b._origY-b._origR)+"px";
+    b.r=b._origR;b.x=b._origX;b.y=b._origY;
+    el.innerHTML="";
+    setTimeout(()=>{
+        el.style.setProperty("--bubble-color",b.color);
+        for(let i=0;i<3;i++){const sp=document.createElement("div");sp.className="speck";sp.style.width=(2+i*1.2)+"px";sp.style.height=(2+i*1.2)+"px";el.appendChild(sp);}
+        const title=document.createElement("div");title.className="bubble-title";title.textContent=b.name;el.appendChild(title);
+        el.style.transition="opacity 0.45s ease,filter 0.4s ease,box-shadow 0.5s ease";
+    },420);
+    state.bubbles.forEach(o=>{if(o.el&&o.el.style)o.el.classList.remove("fade-out");});
+    state.mode="float";state.focused=null;
+}
+
+function summarizeText(text){
+    const cleaned=text.replace(/[\s，。！？、；：""''（）\(\)\[\]【】\-,\.\!\?;:'"\(\)\[\]\{\}]/g,"");
+    const particles=new Set(["的","了","是","在","我","你","他","她","它","们","这","那","和","与","或","也","都","很","就","要","会","能","可以","一个","什么","怎么","为什么","因为","所以","但是","如果","虽然","而且","然后","不","没","有","这个","那个"]);
+    if(cleaned.length>=2){for(let i=0;i<=cleaned.length-2;i++){const seg=cleaned.slice(i,i+2);if(!particles.has(seg[0])&&!particles.has(seg[1]))return seg;}return cleaned.slice(0,2);}
+    return cleaned.slice(0,2)||"灵感";
+}
+
+function escapeHTML(str){ const d=document.createElement("div");d.textContent=str;return d.innerHTML; }
+
+function renderIdeaBubbles(main){
+    const container=document.getElementById("ideaBubbles-"+main.id);if(!container)return;
+    const active=main.ideas.filter(i=>!i.done);
+    if(active.length===0){container.innerHTML=`<div style="color:rgba(160,100,50,0.22);text-align:center;padding:24px 0;width:100%;font-family:'Noto Serif SC','Songti SC',serif;font-size:12px;">还没有灵感，选择颜色后输入</div>`;return;}
+    container.innerHTML=active.map(idea=>`<div class="mini-bubble" data-idea-id="${idea.id}" style="background:radial-gradient(circle at 35% 30%,rgba(255,255,255,0.3),transparent 40%),${idea.color||main.color};">${escapeHTML(idea.summary||summarizeText(idea.content))}</div>`).join("");
+    container.querySelectorAll(".mini-bubble").forEach(mb=>{const ideaId=mb.dataset.ideaId,idea=active.find(i=>i.id===ideaId);if(!idea)return;mb.addEventListener("click",e=>{e.stopPropagation();showIdeaOverlay(main,idea,mb);});});
+}
+
+function showIdeaOverlay(main,idea,bubbleEl){
+    const existing=main.el.querySelector(".idea-overlay");if(existing)existing.remove();
+    const overlay=document.createElement("div");overlay.className="idea-overlay";
+    overlay.innerHTML=`<button class="close-overlay">×</button><div class="full-text">${escapeHTML(idea.content)}</div><div class="overlay-actions"><button class="done-btn">标记完成</button><button class="danger delete-btn">删除</button></div>`;
+    main.el.appendChild(overlay);
+    overlay.querySelector(".close-overlay").onclick=e=>{e.stopPropagation();overlay.remove();};
+    overlay.querySelector(".done-btn").onclick=e=>{e.stopPropagation();idea.done=true;overlay.remove();const r=bubbleEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;for(let i=0;i<14;i++){const p=document.createElement("div");p.className="particle";p.style.background=idea.color||main.color;p.style.left=cx+"px";p.style.top=cy+"px";app.appendChild(p);p.animate([{transform:"translate(0,0) scale(1)",opacity:1},{transform:`translate(${main.x-cx+(Math.random()-.5)*60}px,${main.y-cy+(Math.random()-.5)*60}px) scale(.08)`,opacity:0}],{duration:600,easing:"cubic-bezier(.2,.8,.2,1)"});setTimeout(()=>p.remove(),600);}renderIdeaBubbles(main);renderDoneOrbs(main);save();updateCounter();};
+    overlay.querySelector(".delete-btn").onclick=e=>{e.stopPropagation();const r=bubbleEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;for(let i=0;i<18;i++){const p=document.createElement("div");p.className="particle";p.style.background=idea.color||main.color;p.style.left=cx+"px";p.style.top=cy+"px";app.appendChild(p);p.animate([{transform:"translate(0,0) scale(1)",opacity:1},{transform:`translate(${main.x-cx+(Math.random()-.5)*60}px,${main.y-cy+(Math.random()-.5)*60}px) scale(.08)`,opacity:0}],{duration:650,easing:"cubic-bezier(.2,.8,.2,1)"});setTimeout(()=>p.remove(),650);}overlay.remove();main.ideas=main.ideas.filter(i=>i.id!==idea.id);setTimeout(()=>{renderIdeaBubbles(main);save();updateCounter();},200);};
+}
+
+function addIdeaFromInput(main,inputEl){
+    const val=inputEl.value.trim();if(!val)return;
+    const summary=summarizeText(val);
+    main.ideas.unshift({id:uid(),content:val,summary,color:main._pickColor||main.color,createdAt:Date.now(),done:false});
+    inputEl.value="";inputEl.style.height="auto";renderIdeaBubbles(main);save();updateCounter();
+}
+
+function renderDoneOrbs(main){
+    document.querySelectorAll(".done-orb").forEach(o=>o.remove());
+    const done=main.ideas.filter(i=>i.done);if(!done.length)return;
+    const orbR=22,orbitDist=main._origR+55;
+    done.forEach((idea,i)=>{const angle=(Math.PI*2/done.length)*i-Math.PI/2;const ox=main._origX+Math.cos(angle)*orbitDist,oy=main._origY+Math.sin(angle)*orbitDist;const orb=document.createElement("div");orb.className="done-orb";orb.style.cssText=`width:${orbR*2}px;height:${orbR*2}px;left:${ox-orbR}px;top:${oy-orbR}px;`;layer.appendChild(orb);});
+}
+
+function deleteBubble(b){
+    document.querySelectorAll(".done-orb").forEach(o=>o.remove());const delBtn=document.getElementById("deleteMainBtn");if(delBtn)delBtn.remove();
+    if(b.el&&b.el.remove)b.el.remove();state.bubbles=state.bubbles.filter(x=>x.id!==b.id);state.mode="float";state.focused=null;
+    state.bubbles.forEach(o=>{if(o.el&&o.el.style)o.el.classList.remove("fade-out");});save();updateCounter();
+}
+
+function maybeReview(main){
+    const today=new Date().toDateString(),key=main.id+today;if(state.reviewToday[key])return;
+    const list=main.ideas.filter(i=>!i.done);if(!list.length)return;
+    const pick=list[Math.floor(Math.random()*list.length)],box=document.getElementById("reviewBubble");
+    box.innerHTML=`✨ 重温：${pick.content.slice(0,32)}`;box.style.opacity=1;setTimeout(()=>{box.style.opacity=0;},4200);state.reviewToday[key]=true;save();
+}
+
+function showNameDialog(callback){
+    const overlay=document.createElement("div");overlay.className="name-dialog-overlay";
+    overlay.innerHTML=`<div class="name-dialog"><h3>新气泡名称</h3><input id="nameDialogInput" placeholder="输入名称…" /><div class="name-dialog-actions"><button id="nameDialogCancel">取消</button><button class="primary" id="nameDialogOk">创建</button></div></div>`;
+    document.body.appendChild(overlay);
+    const input=document.getElementById("nameDialogInput"),ok=document.getElementById("nameDialogOk"),cancel=document.getElementById("nameDialogCancel");
+    const done=(v)=>{overlay.remove();callback(v);};
+    ok.onclick=()=>{const v=input.value.trim();if(v)done(v);};
+    cancel.onclick=()=>done(null);
+    input.addEventListener("keydown",e=>{if(e.key==="Enter"){const v=input.value.trim();if(v)done(v);}});
+    overlay.addEventListener("click",e=>{if(e.target===overlay)done(null);});
+    setTimeout(()=>input.focus(),100);
+}
+document.getElementById("addBtn").onclick=()=>{showNameDialog(name=>{if(!name)return;if(state.mode==="expanded")collapseBubble();createBubble(name,BUBBLE_COLORS[Math.floor(Math.random()*5)]);updateCounter();});};
+document.getElementById("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="灵感气泡数据.json";a.click();};
+
+function updatePhysics(){
+    if(state.mode!=="float")return;
+    state.bubbles.forEach(b=>{if(b.drag)return;b.x+=b.vx;b.y+=b.vy;b.vx*=.998;b.vy*=.998;if(Math.abs(b.vx)<.05)b.vx+=(Math.random()-.5)*0.07;if(Math.abs(b.vy)<.05)b.vy+=(Math.random()-.5)*0.07;if(b.x-b.r<0){b.x=b.r;b.vx*=-1;}if(b.x+b.r>innerWidth){b.x=innerWidth-b.r;b.vx*=-1;}if(b.y-b.r<0){b.y=b.r;b.vy*=-1;}if(b.y+b.r>innerHeight){b.y=innerHeight-b.r;b.vy*=-1;}});
+    for(let i=0;i<state.bubbles.length;i++){for(let j=i+1;j<state.bubbles.length;j++){const a=state.bubbles[i],b=state.bubbles[j];if(state.mode!=="float")continue;const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy),min=a.r+b.r;if(dist<min&&dist>0.001){if(!a.el||!a.el.style||!b.el||!b.el.style)continue;const nx=dx/dist,ny=dy/dist,overlap=min-dist;a.x-=nx*overlap/2;a.y-=ny*overlap/2;b.x+=nx*overlap/2;b.y+=ny*overlap/2;const a_vn=a.vx*nx+a.vy*ny,b_vn=b.vx*nx+b.vy*ny;if(b_vn-a_vn>0)continue;a.el.classList.add("collide");b.el.classList.add("collide");setTimeout(()=>{a.el.classList.remove("collide");b.el.classList.remove("collide");},180);const a_vt_x=a.vx-a_vn*nx,a_vt_y=a.vy-a_vn*ny,b_vt_x=b.vx-b_vn*nx,b_vt_y=b.vy-b_vn*ny,e=0.82,new_a_vn=((a_vn+b_vn)+e*(b_vn-a_vn))/2,new_b_vn=((a_vn+b_vn)+e*(a_vn-b_vn))/2;a.vx=a_vt_x+new_a_vn*nx;a.vy=a_vt_y+new_a_vn*ny;b.vx=b_vt_x+new_b_vn*nx;b.vy=b_vt_y+new_b_vn*ny;}}}
+}
+
+const LIGHT_X=-0.25,LIGHT_Y=-0.2;
+function render(){
+    state.bubbles.forEach(b=>{if(!b.el||!b.el.style)return;if(state.mode==="expanded"&&state.focused===b.id)return;b.el.style.left=(b.x-b.r)+"px";b.el.style.top=(b.y-b.r)+"px";const specks=b.el.querySelectorAll(".speck");specks.forEach((sp,i)=>{const a=(i/specks.length)*Math.PI*2+0.4,d=b.r*(0.22+i*0.14),lx=LIGHT_X*b.r*1.1+d*Math.cos(a),ly=LIGHT_Y*b.r*1.1+d*Math.sin(a);sp.style.left=(b.r+lx+b.vx*2.5)+"px";sp.style.top=(b.r+ly+b.vy*2.5)+"px";const br=0.35+0.65*Math.abs(Math.cos(a-Math.PI/4));sp.style.opacity=br;sp.style.transform=`scale(${0.5+br})`;});});
+    const delBtn=document.getElementById("deleteMainBtn");if(delBtn&&state.focused){const fb=state.bubbles.find(x=>x.id===state.focused);if(fb&&fb._expandTX!==undefined){delBtn.style.left=(fb._expandTX+fb._expandW-22)+"px";delBtn.style.top=(fb._expandTY+4)+"px";}}
+    empty.style.display=state.bubbles.length?"none":"flex";
+}
+
+let bgParticles=Array.from({length:40},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:0.4+Math.random()*1.8,v:0.01+Math.random()*0.05,phase:Math.random()*Math.PI*2,oBase:0.04+Math.random()*0.1}));
+let frameCount=0;
+function drawBg(){ctx.clearRect(0,0,innerWidth,innerHeight);frameCount++;bgParticles.forEach(p=>{p.y-=p.v;p.x+=Math.sin(p.y*0.01+p.phase)*0.08;if(p.y<-15){p.y=innerHeight+15;p.x=Math.random()*innerWidth;}if(p.x<-15)p.x=innerWidth+15;if(p.x>innerWidth+15)p.x=-15;const f=Math.sin(frameCount*0.002+p.phase)*0.4+0.6,r=210+Math.floor(f*40),g=150+Math.floor(f*40),b=90+Math.floor(f*25),o=p.oBase*f;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(${r},${g},${b},${Math.min(0.35,o)})`;ctx.fill();});}
+
+function updateCounter(){let total=0;state.bubbles.forEach(b=>total+=b.ideas.length);counter.textContent=`${total} IDEAS`;}updateCounter();
+app.addEventListener("click",e=>{if(e.target===app||e.target===canvas||e.target===layer){if(state.mode==="expanded")collapseBubble();}});
+function loop(){drawBg();updatePhysics();render();requestAnimationFrame(loop);}loop();
+</script>
+</body>
+</html>
